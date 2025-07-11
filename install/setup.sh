@@ -13,7 +13,7 @@ yum -y update
 yum -y install git perl perl-FindBin perl-open perl-YAML perl-File-HomeDir perl-Unicode-LineBreak zlib-devel gem sqlite-devel mysql-devel
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && source ~/.bashrc && nvm install 16
 git version
-git clone https://gitlab.gameday.nrkk.technology/demo/catalogue-db.git
+git clone https://github.com/newrelickk-learn/demo-catalogue-db.git
 systemctl start mysqld
 sleep 5s;
 mysql -uroot -p$(grep -oP '(?<=A temporary password is generated for root@localhost: ).*' /var/log/mysqld.log) --connect-expired-password -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'P4ssW0rd\!'"
@@ -52,7 +52,7 @@ su - appuser -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/i
 su - appuser -c 'mkdir -p ${PWD}/tmp' &&
 su - appuser -c 'TMPDIR="${PWD}/tmp" rbenv install 3.0.2 -v' &&
 su - appuser -c 'rbenv global 3.0.2' &&
-su - appuser -c 'git clone https://gitlab.gameday.nrkk.technology/demo/catalogue.git' &&
+su - appuser -c 'git clone https://github.com/newrelickk-learn/demo-catalogue.git' &&
 su - appuser -c 'cp -r ~/catalogue/install ~/install' &&
 su - appuser -c 'cd ~/catalogue && bundle update newrelic_rpm newrelic-infinite_tracing puma-newrelic' &&
 su - appuser -c 'cd ~/catalogue && bundle install' &&
@@ -61,7 +61,7 @@ su - appuser -c 'cd ~/catalogue && DB_HOST=localhost NEW_RELIC_LICENSE_KEY='${NE
 
 mkdir -p /demo/script &&
 cd /demo/script
-git clone https://gitlab.gameday.nrkk.technology/demo/catalogue-test.git &&
+git clone https://github.com/newrelickk-learn/demo-catalogue-test.git &&
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm &&
 yum install -y ./google-chrome-stable_current_x86_64.rpm &&
 cd /demo/script/catalogue-test &&
