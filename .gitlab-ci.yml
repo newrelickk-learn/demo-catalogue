@@ -1,0 +1,114 @@
+stages:
+  - build
+  - deploy
+
+docker-build:
+  # Use the official docker image.
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+
+
+  stage: build
+  services:
+    - name: registry.hub.docker.com/library/docker:dind
+      command: ["sh"]
+      entrypoint: ["/usr/local/bin/dockerd-entrypoint.sh"]
+  before_script:
+    - apk add --update py-pip
+    - pip install awscli
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/g7c8o4c7
+  # Default branch leaves tag empty (= latest tag)
+  # All other branches are tagged with the escaped branch name (commit ref slug)
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag="latest"
+        echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = 'latest'"
+      else
+        tag="$CI_COMMIT_REF_SLUG"
+        echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
+      fi
+    - docker build . --network host --tag public.ecr.aws/g7c8o4c7/catalogue:${tag} --build-arg COMMIT_SHA=${CI_COMMIT_SHA}
+    - docker push public.ecr.aws/g7c8o4c7/catalogue:${tag}
+  # Run this job in a branch where a Dockerfile exists
+  only:
+    - merge_requests
+
+docker-build-for-tag:
+  # Use the official docker image.
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+
+  stage: build
+  services:
+    - docker:dind
+  before_script:
+    - apk add --update py-pip
+    - pip install awscli
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/g7c8o4c7
+  # Default branch leaves tag empty (= latest tag)
+  # All other branches are tagged with the escaped branch name (commit ref slug)
+  script:
+    - |
+      tag=$(echo $CI_COMMIT_TAG | sed "s/\./-/g")
+    - docker build . --network host --tag public.ecr.aws/g7c8o4c7/catalogue:${tag} --build-arg COMMIT_SHA=${CI_COMMIT_SHA} --build-arg RELEASE_TAG=${CI_COMMIT_TAG}
+    - docker push public.ecr.aws/g7c8o4c7/catalogue:${tag}
+  # Run this job in a branch where a Dockerfile exists
+  only:
+    - tags
+  except:
+    - schedules
+
+deploy:
+  stage: deploy
+  image: dtzar/helm-kubectl:3.8.2
+  before_script:
+    - apk add --update py-pip
+    - pip install awscli
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag="latest"
+        echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = 'latest'"
+      else
+        tag=`echo $CI_COMMIT_REF_SLUG | sed "s/\//-/g"`
+        echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
+      fi
+    - sed -i "s/catalogue:latest/catalogue:${tag}/g" deployment.yaml
+    - sed -i "s/YOUR_NR_LICENSE_KEY/${NEW_RELIC_LICENSE_KEY}/g" deployment.yaml
+    - sed -i "s/YOUR_TRACE_OBSERVER_HOST/${NEW_RELIC_INFINITE_TRACING_TRACE_OBSERVER_HOST}/g" deployment.yaml
+    - mkdir -p ~/.kube; cat ${KUBE_CONFIG} > /root/.kube/config
+    - kubectl apply -f deployment.yaml
+  only:
+    - merge_requests
+
+deploy-for-schedule:
+  stage: deploy
+  image: dtzar/helm-kubectl:3.8.2
+  before_script:
+    - apk add --update py-pip
+    - pip install awscli
+  script:
+    - |
+      tag_raw=$(git describe --tags)
+      tag=$(echo ${tag_raw}| sed "s/\./-/g")
+      echo $tag
+      description=$(echo ${CI_COMMIT_MESSAGE}|sed "s|/|_|g")
+      echo ${description}
+      hash=${CI_COMMIT_SHA}
+      echo ${hash}
+    - sed -i "s/catalogue:latest/catalogue:${tag}/g" deployment.yaml
+    - sed -i "s/YOUR_NR_LICENSE_KEY/${NEW_RELIC_LICENSE_KEY}/g" deployment.yaml
+    - sed -i "s/YOUR_TRACE_OBSERVER_HOST/${NEW_RELIC_INFINITE_TRACING_TRACE_OBSERVER_HOST}/g" deployment.yaml
+    - mkdir -p ~/.kube; cat ${KUBE_CONFIG} > /root/.kube/config
+    - kubectl apply -f deployment.yaml
+    - echo "s/DESCRIPTION/${description}/;s/TAG/${tag_raw}/;s/HASH/${hash}/;"
+    - sed -i "s/DESCRIPTION/${description}/;s/TAG/${tag_raw}/;s/HASH/${hash}/;" scripts/change_tracking.query
+    - ./scripts/change_tracking.sh ${NEW_RELIC_USER_KEY}
+
+  only:
+    - schedules

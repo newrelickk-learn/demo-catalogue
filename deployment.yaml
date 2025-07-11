@@ -1,0 +1,95 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    name: catalogue-web
+  name: catalogue-web
+  namespace: catalogue
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: catalogue-web
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: catalogue-web
+    spec:
+      containers:
+      - env:
+        - name: NEW_RELIC_APP_NAME
+          value: catalogue-web
+        - name: NEW_RELIC_LICENSE_KEY
+          value: YOUR_NR_LICENSE_KEY
+        - name: NEW_RELIC_DISTRIBUTED_TRACING_ENABLED
+          value: "true"
+        - name: NEW_RELIC_INFINITE_TRACING_TRACE_OBSERVER_HOST
+          value: YOUR_TRACE_OBSERVER_HOST
+        - name: NEW_RELIC_CODE_LEVEL_METRICS_ENABLED
+          value: "true"
+        - name: NEW_RELIC_BROWSER_MONITORING_ATTRIBUTES_ENABLED
+          value: "true"
+        - name: DB_HOST
+          value: catalogue-db
+        - name: RAILS_LOG_TO_STDOUT
+          value: "true"
+        - name: RAILS_SERVE_STATIC_FILES
+          value: "true"
+        - name: RAILS_MAX_THREADS
+          value: "20"
+        image: public.ecr.aws/g7c8o4c7/catalogue:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 3
+          successThreshold: 1
+          timeoutSeconds: 300
+        name: catalogue-web
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 3
+          successThreshold: 1
+          timeoutSeconds: 300
+        resources:
+          limits:
+            cpu: 100m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 1Gi
+        securityContext:
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      

@@ -1,0 +1,26 @@
+services:
+  catalogue:
+    build:
+      context: .
+      args:
+        - COMMIT_SHA='commit_sha'
+    image: azumax/rcatalogue:test
+    container_name: "catalogue"
+    environment:
+      - NEW_RELIC_APP_NAME=local_catalogue
+      - NEW_RELIC_LICENSE_KEY=
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+      - NEW_RELIC_INFINITE_TRACING_TRACE_OBSERVER_HOST=
+      - DB_HOST=rcatalogue-mysql
+      - RAILS_SERVE_STATIC_FILES=true
+      - RAILS_LOG_TO_STDOUT=true
+    ports:
+      - "3000:3000"
+    links:
+      - "rcatalogue-mysql"
+  rcatalogue-mysql:
+    image: azumax/catalogue-db:test
+    container_name: "rcatalogue-mysql"
+    environment:
+      - MYSQL_ROOT_PASSWORD=fake_password
+      - MYSQL_DATABASE=socksdb
